@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Curiosity Coach</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-row">
+      <div class="header-title">
+        <h1>Curiosity Coach</h1>
+        <p class="subtitle">Your NCERT Science guide, Grades 6&ndash;10</p>
+      </div>
+      <div class="header-actions">
+        <button type="button" id="new-chat-button" class="new-chat-btn" aria-label="Start a new chat">
+          <span aria-hidden="true">&#8634;</span> New chat
+        </button>
+        <div class="grade-select-wrap">
+          <label for="grade-select" class="sr-only">Grade</label>
+          <select id="grade-select" required>
+            <option value="" disabled selected>Choose grade...</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="chat-container">
+    <div id="chat-log" class="chat-log"></div>
+
+    <form id="ask-form" class="ask-form">
+      <textarea
+        id="question-input"
+        placeholder="Type your science question here..."
+        rows="2"
+        maxlength="1000"
+        required
+      ></textarea>
+      <button type="submit" id="ask-button" aria-label="Send question">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+          <path d="M2 21l21-9L2 3v7l15 2-15 2z" fill="currentColor"/>
+        </svg>
+      </button>
+    </form>
+    <p class="input-hint">Press Enter to send, Shift+Enter for a new line.</p>
+  </main>
+
+  <script src="/static/vendor/katex/katex.min.js"></script>
+  <script src="/static/vendor/katex/contrib/auto-render.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
