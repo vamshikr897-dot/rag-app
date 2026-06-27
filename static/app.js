@@ -10,6 +10,16 @@ document.addEventListener("DOMContentLoaded", () => {
   let conversationHistory = [];
   const MAX_HISTORY_MESSAGES = 6;
   const HISTORY_CONTENT_CAP = 4000;
+  const MAX_REGENERATE_ATTEMPTS = 2;
+
+  const SESSION_STORAGE_KEY = "curiosityCoachSessionId";
+  let sessionId = sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (!sessionId) {
+    sessionId = crypto.randomUUID();
+    sessionStorage.setItem(SESSION_STORAGE_KEY, sessionId);
+  }
+
+  const GRADE_STORAGE_KEY = "curiosityCoachGrade";
 
   function capHistoryContent(text) {
     return text.length > HISTORY_CONTENT_CAP ? `${text.slice(0, HISTORY_CONTENT_CAP)}…` : text;
@@ -227,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function appendAssistantAnswer(result) {
+  function appendAssistantAnswer(result, question, attemptCount = 0) {
     const bubble = document.createElement("div");
     bubble.className = "message assistant";
 
@@ -296,9 +306,167 @@ document.addEventListener("DOMContentLoaded", () => {
       bubble.appendChild(chips);
     }
 
+    if (result.interaction_id) {
+      appendFeedbackControls(bubble, result, question, attemptCount);
+    }
+
     const row = createMessageRow("assistant", bubble);
     chatLog.appendChild(row);
     chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  const FEEDBACK_REASONS = [
+    { value: "not_relevant", label: "Didn't answer my question" },
+    { value: "too_complicated", label: "Too hard to understand" },
+    { value: "too_short", label: "Too short" },
+    { value: "other", label: "Something else" },
+  ];
+
+  function sendFeedback(interactionId, vote, reason, detail) {
+    fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interaction_id: interactionId, vote, reason: reason || null, detail: detail || null }),
+    }).catch(() => {});
+  }
+
+  function appendFeedbackControls(bubble, result, question, attemptCount) {
+    const feedbackEl = document.createElement("div");
+    feedbackEl.className = "feedback-actions";
+
+    const topRow = document.createElement("div");
+    topRow.className = "feedback-top-row";
+
+    const extraEl = document.createElement("div");
+    extraEl.className = "feedback-extra";
+
+    function appendNote(text) {
+      const note = document.createElement("div");
+      note.className = "feedback-note";
+      note.textContent = text;
+      extraEl.appendChild(note);
+    }
+
+    function triggerRegeneration(reason, detail) {
+      sendFeedback(result.interaction_id, "down", reason, detail);
+
+      if (attemptCount >= MAX_REGENERATE_ATTEMPTS) {
+        appendNote("Thanks for the feedback!");
+        return;
+      }
+      appendNote("Thanks — let me try again...");
+
+      submitQuestion(question, {
+        isRegeneration: true,
+        attemptCount: attemptCount + 1,
+        regenerate: {
+          reason,
+          detail: detail || null,
+          previous_answer: result.answer,
+          previous_interaction_id: result.interaction_id,
+        },
+      });
+    }
+
+    function showReasonChips() {
+      const prompt = document.createElement("div");
+      prompt.className = "feedback-prompt";
+      prompt.textContent = "Sorry about that — what wasn't quite right?";
+      extraEl.appendChild(prompt);
+
+      const reasonsEl = document.createElement("div");
+      reasonsEl.className = "feedback-reasons";
+
+      const chips = [];
+      for (const reasonOption of FEEDBACK_REASONS) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "example-chip";
+        chip.textContent = reasonOption.label;
+        chip.addEventListener("click", () => {
+          chips.forEach((c) => {
+            c.disabled = true;
+          });
+          chip.classList.add("selected");
+
+          if (reasonOption.value === "other") {
+            showDetailInput();
+          } else {
+            triggerRegeneration(reasonOption.value, null);
+          }
+        });
+        chips.push(chip);
+        reasonsEl.appendChild(chip);
+      }
+      extraEl.appendChild(reasonsEl);
+    }
+
+    function showDetailInput() {
+      const detailForm = document.createElement("form");
+      detailForm.className = "feedback-detail-form";
+
+      const detailInput = document.createElement("input");
+      detailInput.type = "text";
+      detailInput.maxLength = 300;
+      detailInput.placeholder = "Tell me a bit more...";
+
+      const detailSubmit = document.createElement("button");
+      detailSubmit.type = "submit";
+      detailSubmit.setAttribute("aria-label", "Send feedback detail");
+      detailSubmit.textContent = "Send";
+
+      detailForm.appendChild(detailInput);
+      detailForm.appendChild(detailSubmit);
+      detailForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const detail = detailInput.value.trim();
+        detailInput.disabled = true;
+        detailSubmit.disabled = true;
+        triggerRegeneration("other", detail);
+      });
+
+      extraEl.appendChild(detailForm);
+      detailInput.focus();
+    }
+
+    const label = document.createElement("span");
+    label.className = "feedback-label";
+    label.textContent = "Was this answer helpful?";
+
+    const upBtn = document.createElement("button");
+    upBtn.type = "button";
+    upBtn.className = "feedback-btn feedback-btn-up";
+    upBtn.title = "This helped me!";
+    upBtn.setAttribute("aria-label", "This helped me!");
+    upBtn.textContent = "👍";
+    upBtn.addEventListener("click", () => {
+      upBtn.disabled = true;
+      downBtn.disabled = true;
+      upBtn.classList.add("selected");
+      sendFeedback(result.interaction_id, "up");
+      appendNote("Glad that helped! Ask me anything else. 🎉");
+    });
+
+    const downBtn = document.createElement("button");
+    downBtn.type = "button";
+    downBtn.className = "feedback-btn feedback-btn-down";
+    downBtn.title = "This didn't help";
+    downBtn.setAttribute("aria-label", "This didn't help");
+    downBtn.textContent = "👎";
+    downBtn.addEventListener("click", () => {
+      upBtn.disabled = true;
+      downBtn.disabled = true;
+      downBtn.classList.add("selected");
+      showReasonChips();
+    });
+
+    topRow.appendChild(label);
+    topRow.appendChild(upBtn);
+    topRow.appendChild(downBtn);
+
+    feedbackEl.appendChild(topRow);
+    feedbackEl.appendChild(extraEl);
+    bubble.appendChild(feedbackEl);
   }
 
   const GRADE_ICONS = { 6: "\u{1F52D}", 7: "\u{1F331}", 8: "\u{1F9EA}", 9: "⚛️", 10: "\u{1F680}" };
@@ -324,6 +492,16 @@ document.addEventListener("DOMContentLoaded", () => {
         gradeSelect.appendChild(option);
       }
       gradeSelect.disabled = false;
+
+      const savedGrade = Number(localStorage.getItem(GRADE_STORAGE_KEY));
+      if (savedGrade && body.grades.includes(savedGrade)) {
+        gradeSelect.value = String(savedGrade);
+        currentGrade = savedGrade;
+        applyGradeTheme(currentGrade);
+        input.disabled = false;
+        button.disabled = false;
+      }
+      renderWelcomeScreen();
     } catch {
       appendMessage("Couldn't load grade list. Please refresh the page.", "error");
     }
@@ -427,6 +605,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     currentGrade = newGrade;
+    if (newGrade !== null) {
+      localStorage.setItem(GRADE_STORAGE_KEY, String(newGrade));
+    } else {
+      localStorage.removeItem(GRADE_STORAGE_KEY);
+    }
     conversationHistory = [];
     applyGradeTheme(currentGrade);
     const hasGrade = currentGrade !== null;
@@ -456,7 +639,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   loadGrades();
-  renderWelcomeScreen();
 
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -467,21 +649,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const question = input.value.trim();
-    if (!question) {
-      return;
+  async function submitQuestion(question, { regenerate = null, isRegeneration = false, attemptCount = 0 } = {}) {
+    if (!isRegeneration) {
+      clearWelcomeScreenIfPresent();
+      appendMessage(question, "student");
     }
-    if (currentGrade === null) {
-      appendMessage("Please choose your grade first.", "error");
-      return;
-    }
-
-    clearWelcomeScreenIfPresent();
-    appendMessage(question, "student");
-    input.value = "";
     button.disabled = true;
     input.disabled = true;
 
@@ -492,7 +664,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const response = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, grade: currentGrade, history: conversationHistory }),
+        body: JSON.stringify({
+          question,
+          grade: currentGrade,
+          session_id: sessionId,
+          history: conversationHistory,
+          ...(regenerate ? { regenerate } : {}),
+        }),
         signal: activeAbortController.signal,
       });
 
@@ -512,7 +690,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         appendMessage(message || "Something went wrong. Please try again.", "error");
       } else {
-        appendAssistantAnswer(body);
+        appendAssistantAnswer(body, question, attemptCount);
         if (body.answer && body.answer.trim()) {
           conversationHistory.push({ role: "user", content: capHistoryContent(question) });
           conversationHistory.push({ role: "assistant", content: capHistoryContent(body.answer) });
@@ -535,5 +713,21 @@ document.addEventListener("DOMContentLoaded", () => {
         input.focus();
       }
     }
+  }
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const question = input.value.trim();
+    if (!question) {
+      return;
+    }
+    if (currentGrade === null) {
+      appendMessage("Please choose your grade first.", "error");
+      return;
+    }
+
+    input.value = "";
+    submitQuestion(question);
   });
 });

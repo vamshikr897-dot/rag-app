@@ -34,6 +34,9 @@ CHAPTER_CHUNK_CAP = int(os.getenv("CHAPTER_CHUNK_CAP", 24))
 CROSS_GRADE_DISTANCE_THRESHOLD = float(os.getenv("CROSS_GRADE_DISTANCE_THRESHOLD", 0.42))
 CROSS_GRADE_TOP_K = int(os.getenv("CROSS_GRADE_TOP_K", 3))
 
+FEEDBACK_DB_PATH = os.getenv("FEEDBACK_DB_PATH", "./feedback.db")
+REGENERATE_TOP_K = int(os.getenv("REGENERATE_TOP_K", TOP_K * 2))
+
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "https://ollama.com")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
 MODEL = os.getenv("MODEL", "gpt-oss:120b")

@@ -105,6 +105,17 @@ Write ONE short, warm, in-character reply, ending with a gentle nudge to ask a S
 ONLY that one reply, nothing else.""",
 }
 
+REGENERATION_INSTRUCTIONS = {
+    "not_relevant": "The student said your previous answer didn't address their question. Look again at "
+    "the textbook context below and make sure you directly answer what they actually asked.",
+    "too_complicated": "The student said your previous answer was too hard to understand. Use simpler "
+    "words, shorter sentences, and include a relatable everyday example.",
+    "too_short": "The student said your previous answer was too short. Give a longer, more detailed "
+    "explanation, with an example.",
+    "other": "The student said your previous answer wasn't quite right. Read their feedback below "
+    "carefully and address it directly.",
+}
+
 CONDENSE_SYSTEM_PROMPT = """Given a short recent conversation and a new follow-up question, decide if the \
 follow-up depends on the prior conversation (e.g. uses pronouns, says "explain more", "what about...", \
 or omits a subject already discussed).
@@ -412,9 +423,31 @@ def _handle_refusal(query: str, collection, grade: int) -> dict | None:
     return _build_fallback_response(parsed["category"], parsed, query, grade)
 
 
-def _answer_with_llm(query: str, chunks: list[dict], grade: int, history: list[dict], chapter_heading: str | None) -> dict:
+def _build_regeneration_note(regenerate: dict) -> str:
+    previous_answer = regenerate.get("previous_answer", "")
+    detail = regenerate.get("detail")
+
+    note = f'REGENERATION CONTEXT:\nYour previous answer was:\n"{previous_answer}"'
+    if detail:
+        note += f'\n\nThe student also said: "{detail}"'
+    return note
+
+
+def _answer_with_llm(
+    query: str,
+    chunks: list[dict],
+    grade: int,
+    history: list[dict],
+    chapter_heading: str | None,
+    regenerate: dict | None = None,
+) -> dict:
     prompt = build_prompt(query, chunks)
     system_prompt = build_system_prompt(grade)
+
+    if regenerate:
+        reason = regenerate.get("reason", "other")
+        system_prompt += "\n\n" + REGENERATION_INSTRUCTIONS.get(reason, REGENERATION_INSTRUCTIONS["other"])
+        prompt = _build_regeneration_note(regenerate) + "\n\n" + prompt
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)
@@ -442,7 +475,13 @@ def _answer_with_llm(query: str, chunks: list[dict], grade: int, history: list[d
     }
 
 
-def ask(query: str, collection=None, grade: int = None, history: list[dict] | None = None) -> dict:
+def ask(
+    query: str,
+    collection=None,
+    grade: int = None,
+    history: list[dict] | None = None,
+    regenerate: dict | None = None,
+) -> dict:
     if collection is None:
         collection = get_collection()
     history = history or []
@@ -464,16 +503,17 @@ def ask(query: str, collection=None, grade: int = None, history: list[dict] | No
 
         chapters = get_chapter_directory(collection, grade)
         answer = format_chapter_directory_answer(grade, chapters, invalid_chapter=chapter_number)
-        return _directory_response(answer)
+        return _directory_response(answer, response_category="chapter_directory")
 
     if grade is not None and CHAPTER_LIST_INTENT_RE.search(query):
         chapters = get_chapter_directory(collection, grade)
         answer = format_chapter_directory_answer(grade, chapters)
-        return _directory_response(answer)
+        return _directory_response(answer, response_category="chapter_directory")
 
     retrieval_query = condense_query(query, history) if history else query
-    chunks = retrieve_context(retrieval_query, collection, grade=grade)
-    result = _answer_with_llm(query, chunks, grade, history, chapter_heading=None)
+    top_k = config.REGENERATE_TOP_K if regenerate and regenerate.get("reason") == "not_relevant" else None
+    chunks = retrieve_context(retrieval_query, collection, top_k=top_k, grade=grade)
+    result = _answer_with_llm(query, chunks, grade, history, chapter_heading=None, regenerate=regenerate)
 
     if result["answer"].strip() == NOT_FOUND_MARKER:
         fallback = _handle_refusal(query, collection, grade) if grade is not None else None

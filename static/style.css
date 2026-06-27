@@ -360,6 +360,126 @@ body.grade-theme-10 { background: #fdeaf0; }
   padding-left: 1.1rem;
 }
 
+.feedback-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  width: 100%;
+}
+
+.feedback-top-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.feedback-label {
+  font-size: 0.8rem;
+  color: #9aa5b1;
+}
+
+.feedback-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  font-size: 0.95rem;
+  background: white;
+  border: 1px solid #d0d7de;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.feedback-btn:hover {
+  background: #f4f6f8;
+}
+
+.feedback-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.feedback-btn-up.selected {
+  background: #d8f5e3;
+  border-color: #34a853;
+  opacity: 1;
+}
+
+.feedback-btn-down.selected {
+  background: #fdecea;
+  border-color: #d93025;
+  opacity: 1;
+}
+
+.feedback-extra {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.feedback-reasons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.feedback-reasons .example-chip {
+  width: 100%;
+  text-align: center;
+}
+
+.feedback-reasons .example-chip.selected {
+  background: #dde9ff;
+  border-color: #2f7df6;
+  font-weight: 600;
+}
+
+.feedback-note {
+  font-size: 0.82rem;
+  color: #5a6573;
+  font-style: italic;
+}
+
+.feedback-prompt {
+  font-size: 0.82rem;
+  color: #5a6573;
+  margin-bottom: 0.4rem;
+  width: 100%;
+}
+
+.feedback-detail-form {
+  display: flex;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.feedback-detail-form input {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  font-family: inherit;
+}
+
+.feedback-detail-form button {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: white;
+  background: #2f7df6;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .ask-form {
   display: flex;
   gap: 0.5rem;

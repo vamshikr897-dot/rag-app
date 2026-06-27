@@ -3,6 +3,7 @@ __pycache__/
 chroma_db/
 venv/
 *.pyc
+feedback.db
 .claude/
 .pytest_cache/
 *.egg-info/
