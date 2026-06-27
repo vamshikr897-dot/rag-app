@@ -4,6 +4,7 @@ chroma_db/
 venv/
 *.pyc
 feedback.db
+data/
 .claude/
 .pytest_cache/
 *.egg-info/
