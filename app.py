@@ -68,7 +68,13 @@ class FeedbackRequest(BaseModel):
 
 @app.get("/")
 def index(request: Request):
-    return templates.TemplateResponse(request, "index.html", {})
+    static_version = int(
+        max(
+            (BASE_DIR / "static" / "app.js").stat().st_mtime,
+            (BASE_DIR / "static" / "style.css").stat().st_mtime,
+        )
+    )
+    return templates.TemplateResponse(request, "index.html", {"static_version": static_version})
 
 
 @app.get("/api/health")

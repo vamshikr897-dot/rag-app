@@ -518,6 +518,48 @@ body.grade-theme-10 { background: #fdeaf0; }
   cursor: not-allowed;
 }
 
+button.mic-btn {
+  background: white;
+  color: #2f7df6;
+  border: 1px solid #c7d8fb;
+}
+
+.mic-btn:hover:not(:disabled) {
+  background: #eef4ff;
+}
+
+button.mic-btn:disabled {
+  background: #f4f6f8;
+  color: #9aa5b1;
+  border-color: #e1e4e8;
+  cursor: not-allowed;
+}
+
+.mic-btn.listening {
+  background: #fdecea;
+  color: #d93025;
+  border-color: #f5b7b1;
+  animation: mic-pulse 1.4s infinite ease-in-out;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 48, 37, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(217, 48, 37, 0.12); }
+}
+
+.voice-status:not(.sr-only) {
+  margin: 0.35rem 0.5rem 0;
+  font-size: 0.78rem;
+  color: #5a6573;
+  text-align: left;
+}
+
+.voice-status.voice-status-error:not(.sr-only) {
+  color: #b3261e;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
 .input-hint {
   margin: 0.35rem 0.5rem 0;
   font-size: 0.78rem;

@@ -5,12 +5,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const button = document.getElementById("ask-button");
   const gradeSelect = document.getElementById("grade-select");
   const newChatButton = document.getElementById("new-chat-button");
+  const micButton = document.getElementById("mic-button");
+  const voiceStatus = document.getElementById("voice-status");
   let currentGrade = null;
   let activeAbortController = null;
   let conversationHistory = [];
   const MAX_HISTORY_MESSAGES = 6;
   const HISTORY_CONTENT_CAP = 4000;
   const MAX_REGENERATE_ATTEMPTS = 2;
+
+  let recognition = null;
+  let isListening = false;
+  let userStoppedListening = true;
+  let dictationBaseText = "";
+  let finalizedTranscript = "";
+  let restartAttempts = 0;
+  const MAX_RESTART_ATTEMPTS = 5;
+  const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   const SESSION_STORAGE_KEY = "curiosityCoachSessionId";
   let sessionId = sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -475,6 +486,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadGrades() {
     button.disabled = true;
     input.disabled = true;
+    micButton.disabled = true;
     gradeSelect.disabled = true;
 
     try {
@@ -500,6 +512,7 @@ document.addEventListener("DOMContentLoaded", () => {
         applyGradeTheme(currentGrade);
         input.disabled = false;
         button.disabled = false;
+        micButton.disabled = false;
       }
       renderWelcomeScreen();
     } catch {
@@ -598,6 +611,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   gradeSelect.addEventListener("change", () => {
+    if (isListening) {
+      stopListening();
+    }
+
     const newGrade = gradeSelect.value ? Number(gradeSelect.value) : null;
 
     if (currentGrade !== null && newGrade !== currentGrade) {
@@ -615,6 +632,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const hasGrade = currentGrade !== null;
     input.disabled = !hasGrade;
     button.disabled = !hasGrade;
+    micButton.disabled = !hasGrade;
     if (chatLog.querySelector(".welcome-screen")) {
       renderWelcomeScreen();
     }
@@ -624,6 +642,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   newChatButton.addEventListener("click", () => {
+    if (isListening) {
+      stopListening();
+    }
     if (activeAbortController) {
       activeAbortController.abort();
     }
@@ -633,12 +654,178 @@ document.addEventListener("DOMContentLoaded", () => {
     const hasGrade = currentGrade !== null;
     input.disabled = !hasGrade;
     button.disabled = !hasGrade;
+    micButton.disabled = !hasGrade;
     if (hasGrade) {
       input.focus();
     }
   });
 
+  function setVoiceStatus(message, isError) {
+    voiceStatus.textContent = message;
+    voiceStatus.classList.toggle("voice-status-error", Boolean(isError));
+    voiceStatus.classList.toggle("sr-only", !message);
+  }
+
+  function setListeningUIState(listening) {
+    isListening = listening;
+    micButton.classList.toggle("listening", listening);
+    micButton.setAttribute("aria-label", listening ? "Stop voice input" : "Use voice input");
+    micButton.setAttribute("title", listening ? "Listening… click to stop" : "Click and start speaking");
+    if (!listening) {
+      setVoiceStatus("", false);
+    }
+  }
+
+  function joinDictation(base, finalText, interimText) {
+    const dictated = `${finalText}${interimText}`;
+    if (!base) {
+      return dictated;
+    }
+    if (!dictated) {
+      return base;
+    }
+    const needsSpace = !/\s$/.test(base);
+    return `${base}${needsSpace ? " " : ""}${dictated}`;
+  }
+
+  function handleRecognitionResult(event) {
+    restartAttempts = 0;
+
+    let finalChunk = "";
+    let interimChunk = "";
+
+    for (let i = 0; i < event.results.length; i++) {
+      const result = event.results[i];
+      const transcript = result[0].transcript;
+      if (result.isFinal) {
+        finalChunk += transcript;
+      } else {
+        interimChunk += transcript;
+      }
+    }
+
+    finalizedTranscript = finalChunk;
+    input.value = joinDictation(dictationBaseText, finalizedTranscript, interimChunk);
+  }
+
+  function handleRecognitionError(event) {
+    console.error("Voice input error:", event.error);
+
+    if (event.error === "no-speech" || event.error === "aborted") {
+      return;
+    }
+
+    if (
+      event.error === "not-allowed" ||
+      event.error === "permission-denied" ||
+      event.error === "service-not-allowed"
+    ) {
+      userStoppedListening = true;
+      setListeningUIState(false);
+      setVoiceStatus(
+        "Microphone access was denied. Check your browser permissions to use voice input.",
+        true
+      );
+      return;
+    }
+
+    userStoppedListening = true;
+    setListeningUIState(false);
+    setVoiceStatus("Voice input had a problem and stopped. You can try again or type your question.", true);
+  }
+
+  function handleRecognitionEnd() {
+    if (userStoppedListening) {
+      setListeningUIState(false);
+      recognition = null;
+      return;
+    }
+
+    if (restartAttempts >= MAX_RESTART_ATTEMPTS) {
+      setListeningUIState(false);
+      setVoiceStatus("Voice input stopped. Tap the mic to try again.", true);
+      recognition = null;
+      return;
+    }
+
+    restartAttempts++;
+    try {
+      recognition = createRecognition();
+      recognition.start();
+    } catch (err) {
+      console.error("Voice input failed to restart:", err);
+      setListeningUIState(false);
+      setVoiceStatus("Voice input stopped unexpectedly. Tap the mic to try again.", true);
+      recognition = null;
+    }
+  }
+
+  function createRecognition() {
+    const recog = new SpeechRecognitionImpl();
+    recog.continuous = true;
+    recog.interimResults = true;
+    recog.lang = "en-US";
+
+    recog.onresult = handleRecognitionResult;
+    recog.onerror = handleRecognitionError;
+    recog.onend = handleRecognitionEnd;
+
+    return recog;
+  }
+
+  function startListening() {
+    dictationBaseText = input.value;
+    finalizedTranscript = "";
+    userStoppedListening = false;
+    restartAttempts = 0;
+
+    try {
+      recognition = createRecognition();
+      recognition.start();
+    } catch (err) {
+      console.error("Voice input failed to start:", err);
+      recognition = null;
+      setListeningUIState(false);
+      setVoiceStatus("Couldn't start voice input. Please try again.", true);
+      return;
+    }
+
+    setListeningUIState(true);
+    setVoiceStatus("Listening...", false);
+  }
+
+  function stopListening() {
+    userStoppedListening = true;
+    if (recognition) {
+      recognition.stop();
+    }
+    setListeningUIState(false);
+  }
+
+  function handleMicButtonClick() {
+    if (micButton.disabled) {
+      return;
+    }
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  }
+
+  function initVoiceInput() {
+    if (!SpeechRecognitionImpl) {
+      console.info("Voice input: SpeechRecognition API not detected in this browser.");
+      micButton.hidden = true;
+      return;
+    }
+    console.info("Voice input: SpeechRecognition API detected, mic button enabled.");
+    micButton.hidden = false;
+    micButton.addEventListener("click", handleMicButtonClick);
+  }
+
   loadGrades();
+  initVoiceInput();
 
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -656,6 +843,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     button.disabled = true;
     input.disabled = true;
+    micButton.disabled = true;
 
     const thinkingEl = appendThinkingIndicator();
     activeAbortController = new AbortController();
@@ -709,6 +897,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const hasGrade = currentGrade !== null;
       button.disabled = !hasGrade;
       input.disabled = !hasGrade;
+      micButton.disabled = !hasGrade;
       if (hasGrade) {
         input.focus();
       }
@@ -717,6 +906,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+
+    if (isListening) {
+      stopListening();
+    }
 
     const question = input.value.trim();
     if (!question) {

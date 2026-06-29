@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Curiosity Coach</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_version }}">
   <link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
 </head>
 <body>
@@ -39,17 +39,24 @@
         maxlength="1000"
         required
       ></textarea>
+      <button type="button" id="mic-button" class="mic-btn" aria-label="Use voice input" title="Click and start speaking" hidden>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+          <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" fill="currentColor"/>
+          <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11z" fill="currentColor"/>
+        </svg>
+      </button>
       <button type="submit" id="ask-button" aria-label="Send question">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
           <path d="M2 21l21-9L2 3v7l15 2-15 2z" fill="currentColor"/>
         </svg>
       </button>
     </form>
+    <p id="voice-status" class="voice-status sr-only" aria-live="polite"></p>
     <p class="input-hint">Press Enter to send, Shift+Enter for a new line.</p>
   </main>
 
   <script src="/static/vendor/katex/katex.min.js"></script>
   <script src="/static/vendor/katex/contrib/auto-render.min.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ static_version }}"></script>
 </body>
 </html>
