@@ -13,6 +13,7 @@ A grade-aware RAG study assistant for NCERT Science (Grades 6-10) — ask a ques
 - **Source attribution** — answers cite chapter + page, grouped and page-range-collapsed per chapter (no duplicate per-page spam for long chapter summaries).
 - **Feedback loop** — every answer gets a thumbs up/down. A thumbs down asks why (not relevant, too complicated, too short, other) and automatically regenerates the answer using that signal (e.g. pulling more chunks, simplifying, adding detail), capped at 2 retries per question. Every interaction is logged to a local SQLite DB (`feedback.db`) for analytics, independent of what's shown in the UI.
 - **Remembers your grade** — the selected grade persists across reloads (`localStorage`), so a student isn't asked to re-pick it every visit.
+- **Voice input** — a microphone button next to the send button transcribes speech live into the question box (via the browser's native Web Speech API), so students can ask questions out loud instead of typing. No server-side audio processing or API key involved.
 
 ## Tech stack
 
@@ -81,6 +82,7 @@ NCERT textbooks are not included in this repository — only the code that proce
 - English-only; no support for regional-language NCERT editions.
 - Single shared embedding model/collection for all grades — works well at this corpus size but isn't optimized for much larger content sets.
 - No automated test suite yet.
+- Voice input relies on the browser's built-in `SpeechRecognition` API, which Firefox desktop doesn't support — the mic button is automatically hidden there, with typing as the fallback.
 
 ## License
 
